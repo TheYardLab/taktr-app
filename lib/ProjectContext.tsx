@@ -1,35 +1,52 @@
-import { createContext, useState, useContext, ReactNode } from 'react';
+import React, { createContext, useContext, useState, ReactNode } from 'react';
 
-type Handover = {
+// 🔹 Types
+export interface Task {
+  label: string;
+  trade: string;
+  start: string | Date;
+  finish: string | Date;
+  duration: number;
+  startDay?: number;
+  name?: string;
+}
+
+export interface Handover {
   from: string;
   to: string;
   day: number;
-};
+}
 
-type ProjectContextType = {
-  scheduleData: any[];
+export interface SCurvePoint {
+  day: number;
+  progress: number;
+}
+
+export interface ProjectContextType {
+  scheduleData: Task[];
+  setScheduleData: (tasks: Task[]) => void;
   handovers: Handover[];
-  setScheduleData: (data: any[]) => void;
-  setHandovers: (handover: Handover[]) => void;
-};
+  setHandovers: (handovers: Handover[]) => void;
+  scurve: SCurvePoint[];
+  setSCurve: (points: SCurvePoint[]) => void;
+}
 
 const ProjectContext = createContext<ProjectContextType | undefined>(undefined);
 
-export const ProjectProvider = ({ children }: { children: ReactNode }) => {
-  const [scheduleData, setScheduleData] = useState<any[]>([]);
+export function ProjectProvider({ children }: { children: ReactNode }) {
+  const [scheduleData, setScheduleData] = useState<Task[]>([]);
   const [handovers, setHandovers] = useState<Handover[]>([]);
+  const [scurve, setSCurve] = useState<SCurvePoint[]>([]);
 
   return (
-    <ProjectContext.Provider value={{ scheduleData, handovers, setScheduleData, setHandovers }}>
+    <ProjectContext.Provider value={{ scheduleData, setScheduleData, handovers, setHandovers, scurve, setSCurve }}>
       {children}
     </ProjectContext.Provider>
   );
-};
+}
 
-export const useProject = () => {
+export function useProject(): ProjectContextType {
   const context = useContext(ProjectContext);
-  if (!context) {
-    throw new Error('useProject must be used within ProjectProvider');
-  }
+  if (!context) throw new Error('useProject must be used within a ProjectProvider');
   return context;
-};
+}
