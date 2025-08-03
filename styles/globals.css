@@ -1,0 +1,29 @@
+:root {
+  --brand-bg: #f4f4f4; /* Replace with your logo background color */
+}
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* 🔹 Global Body Styling */
+html, body {
+  height: 100%;
+  background-color: var(--brand-bg);
+  margin: 0;
+  padding: 0;
+}
+
+/* 🔹 Scrollbar styling (optional, for cleaner look) */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #ccc;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #aaa;
+}
