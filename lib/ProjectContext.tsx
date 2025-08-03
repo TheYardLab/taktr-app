@@ -22,7 +22,7 @@ export interface Handover {
 export interface SCurvePoint {
   day: number;
   progress: number;
-  cumulative?: number;
+  cumulative: number; // ✅ Added cumulative to match usage in scurveUtils
 }
 
 // 🔹 Project Context Type
