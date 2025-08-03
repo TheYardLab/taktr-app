@@ -1,45 +1,35 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
-import { useProject, Task } from '@/lib/ProjectContext';
-import { calculateSCurve } from '@/lib/scurveUtils'; // ✅ Correct import
-import TaskSidebar from './TaskSidebar';
+import React, { useEffect } from 'react';
+import { useProject } from '@/lib/ProjectContext';
+import { generateSCurve } from '@/lib/scurveUtils';
 
 export default function TaktPlan() {
-  const { scheduleData, setSCurve } = useProject();
-  const [selectedTaskIndex, setSelectedTaskIndex] = useState<number | null>(null);
+  const { tasks, setSCurve } = useProject();
 
   useEffect(() => {
-    if (scheduleData.length > 0) {
-      const scurvePoints = calculateSCurve(scheduleData); // ✅ Updated function call
+    if (tasks.length > 0) {
+      const scurvePoints = generateSCurve(tasks);
       setSCurve(scurvePoints);
     }
-  }, [scheduleData, setSCurve]);
+  }, [tasks, setSCurve]);
 
   return (
     <div className="bg-white p-4 rounded shadow">
       <h2 className="text-lg font-semibold mb-4">📊 Takt Plan</h2>
-
-      <div className="grid grid-cols-1 gap-2">
-        {scheduleData.map((task: Task, index: number) => (
-          <div
-            key={index}
-            className="flex justify-between items-center p-2 border rounded cursor-pointer hover:bg-gray-100"
-            onClick={() => setSelectedTaskIndex(index)}
-          >
-            <span className="font-medium">{task.label}</span>
-            <span className="text-sm text-gray-600">
-              {String(task.start)} → {String(task.finish)}
-            </span>
-          </div>
-        ))}
-      </div>
-
-      {selectedTaskIndex !== null && (
-        <TaskSidebar
-          taskIndex={selectedTaskIndex}
-          onClose={() => setSelectedTaskIndex(null)}
-        />
+      {tasks.length === 0 ? (
+        <p className="text-gray-500">No tasks loaded.</p>
+      ) : (
+        <ul className="divide-y">
+          {tasks.map((task, idx) => (
+            <li key={idx} className="py-2 flex justify-between">
+              <span>{task.label}</span>
+              <span className="text-gray-500">
+                {task.trade} — Day {task.startDay} to {task.finishDay}
+              </span>
+            </li>
+          ))}
+        </ul>
       )}
     </div>
   );
