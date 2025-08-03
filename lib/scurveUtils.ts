@@ -2,13 +2,14 @@ import { Task, SCurvePoint } from './ProjectContext';
 
 export function generateSCurve(tasks: Task[]): SCurvePoint[] {
   const points: SCurvePoint[] = [];
-  let cumulative = 0;
+  let cumulativeProgress = 0;
 
-  tasks.forEach((task) => {
-    cumulative += task.duration;
+  tasks.forEach(task => {
+    cumulativeProgress += task.duration || 0;
     points.push({
       day: task.startDay || 0,
-      cumulative
+      progress: task.duration,
+      cumulative: cumulativeProgress // ✅ This now matches SCurvePoint
     });
   });
 
