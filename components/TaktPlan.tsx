@@ -1,19 +1,24 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { useProject, type Task } from '@/lib/ProjectContext';
+import { useProject } from '@/lib/ProjectContext';
+import type { Task } from '@/lib/ProjectContext';
 import { generateSCurve } from '@/lib/scurveUtils';
 import TaskSidebar from './TaskSidebar';
 
 export default function TaktPlan() {
-  const { tasks, setSCurve } = useProject();
+  const { tasks, setTasks, setSCurve } = useProject();
   const [selectedTaskIndex, setSelectedTaskIndex] = useState<number | null>(null);
 
   useEffect(() => {
-    if (tasks.length > 0) {
-      setSCurve(generateSCurve(tasks));
+    if (tasks && tasks.length > 0) {
+      const scurvePoints = generateSCurve(tasks);
+      setSCurve(scurvePoints);
     }
   }, [tasks, setSCurve]);
+
+  const handleTaskClick = (index: number) => setSelectedTaskIndex(index);
+  const closeSidebar = () => setSelectedTaskIndex(null);
 
   return (
     <div className="bg-white p-4 rounded shadow relative">
@@ -22,11 +27,11 @@ export default function TaktPlan() {
         {tasks.length === 0 ? (
           <p className="text-gray-500">No tasks scheduled yet.</p>
         ) : (
-          tasks.map((task: Task, index: number) => (
+          tasks.map((task: Task, index) => (
             <div
               key={index}
               className="border p-2 rounded cursor-pointer hover:bg-gray-50"
-              onClick={() => setSelectedTaskIndex(index)}
+              onClick={() => handleTaskClick(index)}
             >
               <p className="text-sm font-semibold">{task.label}</p>
               <p className="text-xs text-gray-500">
@@ -38,7 +43,7 @@ export default function TaktPlan() {
       </div>
 
       {selectedTaskIndex !== null && (
-        <TaskSidebar taskIndex={selectedTaskIndex} onClose={() => setSelectedTaskIndex(null)} />
+        <TaskSidebar taskIndex={selectedTaskIndex} onClose={closeSidebar} />
       )}
     </div>
   );

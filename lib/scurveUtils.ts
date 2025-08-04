@@ -1,15 +1,18 @@
-import type { Task, SCurvePoint } from './ProjectContext';
+import { Task, SCurvePoint } from './ProjectContext';
 
+// ✅ Generates SCurve points based on tasks
 export function generateSCurve(tasks: Task[]): SCurvePoint[] {
-  let cumulative = 0;
   const points: SCurvePoint[] = [];
+  let cumulativeProgress = 0;
 
-  tasks.forEach(task => {
-    cumulative += 100 / tasks.length;
+  tasks.forEach((task) => {
+    const taskProgress = task.progress ?? 0; // Default to 0 if undefined
+    cumulativeProgress += taskProgress;
+
     points.push({
-      day: task.finishDay || task.startDay,
-      progress: Math.min(100, (cumulative / 100) * 100),
-      cumulative
+      day: task.finishDay || task.startDay || 0, // Ensures we capture timeline
+      progress: taskProgress,
+      cumulative: cumulativeProgress,
     });
   });
 
