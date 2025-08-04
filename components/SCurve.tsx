@@ -14,35 +14,23 @@ import {
 } from 'chart.js';
 import { Line } from 'react-chartjs-2';
 
-// ✅ Register Chart.js components
 ChartJS.register(LineElement, CategoryScale, LinearScale, PointElement, Title, Tooltip, Legend);
 
 export default function SCurve() {
   const { scurve } = useProject();
 
-  // ✅ Build chart labels & datasets
   const labels = scurve.map(point => `Day ${point.day}`);
-  const cumulativeData = scurve.map(point => point.cumulative ?? 0);
-  const dailyProgressData = scurve.map(point => point.progress ?? 0);
+  const progressData = scurve.map(point => point.progress || 0); // ✅ no cumulative
 
   const data = {
     labels,
     datasets: [
       {
-        label: 'Cumulative Progress',
-        data: cumulativeData,
+        label: 'S-Curve Progress',
+        data: progressData,
+        fill: false,
         borderColor: '#2563eb',
-        backgroundColor: 'rgba(37, 99, 235, 0.2)',
         tension: 0.3,
-        fill: false,
-      },
-      {
-        label: 'Daily Progress',
-        data: dailyProgressData,
-        borderColor: '#16a34a',
-        backgroundColor: 'rgba(22, 163, 74, 0.2)',
-        tension: 0.3,
-        fill: false,
       }
     ]
   };
@@ -51,7 +39,7 @@ export default function SCurve() {
     responsive: true,
     plugins: {
       legend: { display: true, position: 'bottom' as const },
-      title: { display: true, text: 'S-Curve Progress Tracking' }
+      title: { display: true, text: 'S-Curve Forecast' }
     },
     scales: {
       y: {

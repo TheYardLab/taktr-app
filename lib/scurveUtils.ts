@@ -1,17 +1,19 @@
-import { Task, SCurvePoint } from './ProjectContext';
+// lib/scurveUtils.ts
+import type { Task, SCurvePoint } from './ProjectContext';
 
-// ✅ Generates SCurve points based on tasks
+/**
+ * Generate an S-Curve (progress over time).
+ */
 export function generateSCurve(tasks: Task[]): SCurvePoint[] {
   const points: SCurvePoint[] = [];
   let cumulativeProgress = 0;
 
-  tasks.forEach((task) => {
-    const taskProgress = task.progress ?? 0; // Default to 0 if undefined
-    cumulativeProgress += taskProgress;
-
+  tasks.forEach(task => {
+    const dailyProgress = task.progress || 0;
+    cumulativeProgress += dailyProgress;
     points.push({
-      day: task.finishDay || task.startDay || 0, // Ensures we capture timeline
-      progress: taskProgress,
+      day: task.startDay,
+      progress: dailyProgress,
       cumulative: cumulativeProgress,
     });
   });
