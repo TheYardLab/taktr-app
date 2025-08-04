@@ -1,42 +1,59 @@
+'use client';
+
 import React from 'react';
 import { useProject } from '@/lib/ProjectContext';
-import { Chart as ChartJS, CategoryScale, LinearScale, LineElement, PointElement, Title, Tooltip, Legend } from 'chart.js';
+import {
+  Chart as ChartJS,
+  LineElement,
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  Title,
+  Tooltip,
+  Legend
+} from 'chart.js';
 import { Line } from 'react-chartjs-2';
 
-// Register Chart.js
-ChartJS.register(CategoryScale, LinearScale, LineElement, PointElement, Title, Tooltip, Legend);
+ChartJS.register(LineElement, CategoryScale, LinearScale, PointElement, Title, Tooltip, Legend);
 
 export default function SCurve() {
   const { scurve } = useProject();
 
-  const chartData = {
-    labels: scurve.map(point => `Day ${point.day}`),
+  const labels = scurve.map(point => `Day ${point.day}`);
+  const cumulativeData = scurve.map(point => point.cumulative || 0);
+
+  const data = {
+    labels,
     datasets: [
       {
-        label: 'Progress',
-        data: scurve.map(point => point.progress),
-        borderColor: '#4f46e5',
-        backgroundColor: '#4f46e5',
+        label: 'S-Curve Progress',
+        data: cumulativeData,
+        fill: false,
+        borderColor: '#2563eb',
         tension: 0.3,
-      },
-      {
-        label: 'Cumulative Progress',
-        data: scurve.map(point => point.cumulative ?? 0),
-        borderColor: '#22c55e',
-        backgroundColor: '#22c55e',
-        tension: 0.3,
-      },
-    ],
+      }
+    ]
+  };
+
+  const options = {
+    responsive: true,
+    plugins: {
+      legend: { display: true, position: 'bottom' as const },
+      title: { display: true, text: 'S-Curve Forecast' }
+    },
+    scales: {
+      y: {
+        beginAtZero: true,
+        max: 100,
+        ticks: { stepSize: 10 }
+      }
+    }
   };
 
   return (
     <div className="bg-white p-4 rounded shadow">
-      <h2 className="text-lg font-semibold mb-4">📈 S-Curve Forecast</h2>
-      {scurve.length === 0 ? (
-        <p className="text-gray-500">No S-Curve data available.</p>
-      ) : (
-        <Line data={chartData} />
-      )}
+      <h2 className="text-lg font-semibold mb-4">📈 S-Curve</h2>
+      <Line data={data} options={options} />
     </div>
   );
 }

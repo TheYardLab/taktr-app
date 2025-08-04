@@ -1,18 +1,15 @@
-import { Task, SCurvePoint } from './ProjectContext';
+import type { Task, SCurvePoint } from './ProjectContext';
 
-// 🔹 Calculate S-Curve points from tasks
-export function calculateSCurve(tasks: Task[]): SCurvePoint[] {
+export function generateSCurve(tasks: Task[]): SCurvePoint[] {
+  let cumulative = 0;
   const points: SCurvePoint[] = [];
-  let cumulativeProgress = 0;
 
-  tasks.forEach((task) => {
-    const progressValue = task.duration > 0 ? (1 / task.duration) * 100 : 0;
-    cumulativeProgress += progressValue;
-
+  tasks.forEach(task => {
+    cumulative += 100 / tasks.length;
     points.push({
-      day: task.startDay || 0,
-      progress: progressValue,
-      cumulative: cumulativeProgress, // ✅ Now correctly matches SCurvePoint type
+      day: task.finishDay || task.startDay,
+      progress: Math.min(100, (cumulative / 100) * 100),
+      cumulative
     });
   });
 

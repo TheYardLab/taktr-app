@@ -1,72 +1,52 @@
-import React, { createContext, useContext, useState, ReactNode } from 'react';
+'use client';
 
-// 🔹 Task Type
-export interface Task {
+import React, { createContext, useContext, useState, type ReactNode } from 'react';
+
+export type Task = {
   label: string;
   trade: string;
-  start: string | Date;
-  finish: string | Date;
-  duration: number;
-  startDay?: number;
-  finishDay?: number;
-}
+  startDay: number;
+  finishDay: number;
+  notes?: string;
+};
 
-// 🔹 Handover Type
-export interface Handover {
-  from: string;
-  to: string;
-  day: number;
-}
+export type Handover = {
+  fromTrade: string;
+  toTrade: string;
+  zone: string;
+};
 
-// 🔹 S-Curve Point Type
-export interface SCurvePoint {
+export type SCurvePoint = {
   day: number;
   progress: number;
-  cumulative: number; // ✅ Added cumulative to match usage in scurveUtils
-}
+  cumulative: number;
+};
 
-// 🔹 Project Context Type
-interface ProjectContextType {
-  scheduleData: Task[];
-  setScheduleData: React.Dispatch<React.SetStateAction<Task[]>>;
-
+export type ProjectContextType = {
+  tasks: Task[];
+  setTasks: React.Dispatch<React.SetStateAction<Task[]>>;
   handovers: Handover[];
   setHandovers: React.Dispatch<React.SetStateAction<Handover[]>>;
-
   scurve: SCurvePoint[];
   setSCurve: React.Dispatch<React.SetStateAction<SCurvePoint[]>>;
-}
+};
 
-// 🔹 Create Context
 const ProjectContext = createContext<ProjectContextType | undefined>(undefined);
 
-// 🔹 Provider Component
 export function ProjectProvider({ children }: { children: ReactNode }) {
-  const [scheduleData, setScheduleData] = useState<Task[]>([]);
+  const [tasks, setTasks] = useState<Task[]>([]);
   const [handovers, setHandovers] = useState<Handover[]>([]);
   const [scurve, setSCurve] = useState<SCurvePoint[]>([]);
 
   return (
-    <ProjectContext.Provider
-      value={{
-        scheduleData,
-        setScheduleData,
-        handovers,
-        setHandovers,
-        scurve,
-        setSCurve,
-      }}
-    >
+    <ProjectContext.Provider value={{ tasks, setTasks, handovers, setHandovers, scurve, setSCurve }}>
       {children}
     </ProjectContext.Provider>
   );
 }
 
-// 🔹 Hook to use the Project Context
 export function useProject() {
   const context = useContext(ProjectContext);
-  if (!context) {
-    throw new Error('useProject must be used within a ProjectProvider');
-  }
+  if (!context) throw new Error('useProject must be used inside ProjectProvider');
   return context;
 }
