@@ -1,24 +1,21 @@
-// lib/handoverUtils.ts
 import type { Task, Handover } from './ProjectContext';
 
-/**
- * Generate handovers based on finish of one trade matching start of another.
- */
-export function generateHandovers(tasks: Task[]): Handover[] {
+export function detectHandovers(tasks: Task[]): Handover[] {
   const handovers: Handover[] = [];
 
-  tasks.forEach(taskA => {
-    tasks.forEach(taskB => {
-      if (taskA.trade !== taskB.trade && taskA.finishDay === taskB.startDay) {
-        handovers.push({
-          fromTrade: taskA.trade,
-          toTrade: taskB.trade,
-          zone: taskA.label,
-          day: taskA.finishDay,
-        });
-      }
-    });
-  });
+  for (let i = 0; i < tasks.length - 1; i++) {
+    const current = tasks[i];
+    const next = tasks[i + 1];
+
+    if (current.trade !== next.trade) {
+      handovers.push({
+        fromTrade: current.trade,
+        toTrade: next.trade,
+        zone: 'Default Zone',
+        day: current.finishDay
+      });
+    }
+  }
 
   return handovers;
 }

@@ -1,65 +1,84 @@
 'use client';
 
-import React from 'react';
+import React, { useCallback } from 'react';
 import Papa from 'papaparse';
-import { useProject, Task } from '@/lib/ProjectContext';
-import { generateHandovers } from '@/lib/handoverUtils';
-import { generateSCurve } from '@/lib/scurveUtils';
-import { generateMetrics } from '@/lib/metricsUtils';
+import { useDropzone } from 'react-dropzone';
+import { useProject } from '@/lib/ProjectContext';
 
 export default function UploadSchedule() {
-  const { setTasks, setHandovers, setSCurve, setMetrics } = useProject();
+  const { setTasks, setMetrics, setSCurve, setHandovers } = useProject();
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  const onDrop = useCallback((acceptedFiles: File[]) => {
+    acceptedFiles.forEach(file => {
+      Papa.parse(file, {
+        header: true,
+        skipEmptyLines: true,
+        complete: (results) => {
+          const parsedTasks = results.data.map((row: any, index: number) => ({
+            label: row.Task || `Task ${index + 1}`,
+            trade: row.Trade || 'Unknown Trade',
+            startDay: parseInt(row.StartDay || 0),
+            finishDay: parseInt(row.FinishDay || 0),
+            duration: parseInt(row.Duration || 0),
+            completed: row.Completed === 'Yes',
+            notes: row.Notes || '',
+          }));
 
-    Papa.parse(file, {
-      header: true,
-      complete: (results) => {
-        // 1️⃣ Parse tasks
-        const parsedTasks: Task[] = results.data.map((row: any) => ({
-          label: row.Task || 'Unnamed Task',
-          trade: row.Trade || 'Unknown',
-          startDay: parseInt(row.StartDay) || 0,
-          finishDay: parseInt(row.FinishDay) || 0,
-          duration: parseInt(row.Duration) || 0,
-          notes: row.Notes || '',
-          completed: row.Completed?.toLowerCase() === 'yes', // ✅ PPC tracking
-        }));
+          // ✅ Update Project Context
+          setTasks(parsedTasks);
 
-        // 2️⃣ Save tasks
-        setTasks(parsedTasks);
+          // ✅ Metrics calculation
+          const totalTasks = parsedTasks.length;
+          const completedTasks = parsedTasks.filter(t => t.completed).length;
+          const completionRate = totalTasks > 0 ? (completedTasks / totalTasks) * 100 : 0;
+          const avgDuration =
+            totalTasks > 0
+              ? parsedTasks.reduce((sum, t) => sum + (t.duration || 0), 0) / totalTasks
+              : 0;
 
-        // 3️⃣ Generate Handovers
-        const generatedHandovers = generateHandovers(parsedTasks);
-        setHandovers(generatedHandovers);
+          setMetrics({
+            totalTasks,
+            completedTasks,
+            completionRate,
+            avgDuration
+          });
 
-        // 4️⃣ Generate SCurve
-        const scurvePoints = generateSCurve(parsedTasks);
-        setSCurve(scurvePoints);
+          // ✅ S-Curve calculation (simplified)
+          const scurvePoints = parsedTasks.map((t, i) => ({
+            day: t.startDay,
+            progress: (i / totalTasks) * 100,
+            cumulative: ((i + 1) / totalTasks) * 100
+          }));
+          setSCurve(scurvePoints);
 
-        // 5️⃣ Generate Metrics
-        const generatedMetrics = generateMetrics(parsedTasks);
-        setMetrics(generatedMetrics);
-
-        console.log('✅ Tasks loaded:', parsedTasks);
-        console.log('✅ Handovers generated:', generatedHandovers);
-        console.log('✅ SCurve generated:', scurvePoints);
-        console.log('✅ Metrics generated:', generatedMetrics);
-      },
+          // ✅ Handover detection — now includes `day`
+          const handovers = parsedTasks.map((t, i) => ({
+            fromTrade: t.trade,
+            toTrade: parsedTasks[i + 1]?.trade || '',
+            zone: `Zone ${i + 1}`,
+            day: t.finishDay || t.startDay || i
+          }));
+          setHandovers(handovers);
+        }
+      });
     });
-  };
+  }, [setTasks, setMetrics, setSCurve, setHandovers]);
+
+  const { getRootProps, getInputProps, isDragActive } = useDropzone({ onDrop });
 
   return (
-    <div className="bg-white p-4 rounded shadow">
-      <h2 className="text-lg font-semibold mb-2">📤 Upload Schedule</h2>
-      <input
-        type="file"
-        accept=".csv"
-        onChange={handleFileUpload}
-        className="border p-2 rounded w-full"
-      />
+    <div
+      {...getRootProps()}
+      className={`border-2 border-dashed rounded-lg p-6 cursor-pointer text-center transition ${
+        isDragActive ? 'bg-blue-100 border-blue-400' : 'bg-gray-50 border-gray-300'
+      }`}
+    >
+      <input {...getInputProps()} />
+      {isDragActive ? (
+        <p className="text-blue-600 font-semibold">Drop the CSV file here...</p>
+      ) : (
+        <p className="text-gray-600">Drag & drop a project schedule CSV, or click to upload</p>
+      )}
     </div>
   );
 }

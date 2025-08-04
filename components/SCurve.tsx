@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { useProject } from '@/lib/ProjectContext';
+import { useProject } from '../lib/ProjectContext';
 import {
   Chart as ChartJS,
   LineElement,
@@ -20,7 +20,7 @@ export default function SCurve() {
   const { scurve } = useProject();
 
   const labels = scurve.map(point => `Day ${point.day}`);
-  const progressData = scurve.map(point => point.progress || 0); // ✅ no cumulative
+  const progressData = scurve.map(point => point.progress || 0);
 
   const data = {
     labels,
@@ -28,9 +28,8 @@ export default function SCurve() {
       {
         label: 'S-Curve Progress',
         data: progressData,
-        fill: false,
         borderColor: '#2563eb',
-        tension: 0.3,
+        tension: 0.3
       }
     ]
   };
@@ -41,13 +40,7 @@ export default function SCurve() {
       legend: { display: true, position: 'bottom' as const },
       title: { display: true, text: 'S-Curve Forecast' }
     },
-    scales: {
-      y: {
-        beginAtZero: true,
-        max: 100,
-        ticks: { stepSize: 10 }
-      }
-    }
+    scales: { y: { beginAtZero: true, max: 100 } }
   };
 
   return (

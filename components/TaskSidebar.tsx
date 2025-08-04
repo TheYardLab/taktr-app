@@ -1,29 +1,25 @@
 'use client';
 
 import React from 'react';
-import { useProject } from '@/lib/ProjectContext';
-import type { Task } from '@/lib/ProjectContext';
+import { useProject } from '../lib/ProjectContext';
+import type { Task } from '../lib/ProjectContext';
 
-interface TaskSidebarProps {
+interface Props {
   taskIndex: number;
   onClose: () => void;
 }
 
-export default function TaskSidebar({ taskIndex, onClose }: TaskSidebarProps) {
+export default function TaskSidebar({ taskIndex, onClose }: Props) {
   const { tasks } = useProject();
-  const task: Task | undefined = tasks[taskIndex];
-
-  if (!task) return null;
+  const task = tasks[taskIndex] as Task;
 
   return (
-    <div className="absolute top-0 right-0 w-64 bg-gray-100 shadow-lg h-full p-4">
-      <button className="text-red-500 mb-4" onClick={onClose}>
-        Close
-      </button>
-      <h3 className="font-semibold">{task.label}</h3>
-      <p className="text-sm text-gray-500">Trade: {task.trade}</p>
-      <p className="text-sm">Days: {task.startDay} - {task.finishDay}</p>
-      <p className="text-sm">Notes: {task.notes || 'No notes available.'}</p>
+    <div className="fixed right-0 top-0 w-80 h-full bg-white shadow-lg p-4">
+      <button onClick={onClose} className="mb-4 text-red-500">Close</button>
+      <h3 className="text-lg font-semibold mb-2">{task.label}</h3>
+      <p>Trade: {task.trade}</p>
+      <p>Duration: {task.duration} days</p>
+      <p>Notes: {task.notes || 'None'}</p>
     </div>
   );
 }
