@@ -1,32 +1,31 @@
-'use client';
+import React from "react";
+import { useProjectContext, type Handover } from "@/lib/ProjectContext";
 
-import React from 'react';
-import type { Handover } from '../lib/ProjectContext'; // type-only
-import { useProject } from '../lib/ProjectContext';
+interface HandoverComponentProps {
+  handovers?: Handover[];
+}
 
-export default function HandoverComponent() {
-  const { handovers } = useProject();
+export default function HandoverComponent({ handovers }: HandoverComponentProps) {
+  const { activeProject } = useProjectContext();
+
+  // Prefer prop if provided, fallback to context
+  const resolvedHandovers: Handover[] =
+    handovers ?? activeProject?.handovers ?? [];
+
+  if (!resolvedHandovers.length) {
+    return <div>No handover data available</div>;
+  }
 
   return (
-    <div className="bg-white p-4 rounded shadow">
-      <h2 className="text-lg font-semibold mb-4">🔄 Handovers</h2>
-      {handovers.length === 0 ? (
-        <p className="text-gray-500">No handovers scheduled.</p>
-      ) : (
-        handovers.map((handover: Handover, index: number) => (
-          <div
-            key={index}
-            className="border p-2 mb-2 rounded"
-          >
-            <p className="text-sm font-semibold">
-              {handover.fromTrade} ➡ {handover.toTrade}
-            </p>
-            <p className="text-xs text-gray-500">
-              Zone: {handover.zone} — Day {handover.day}
-            </p>
-          </div>
-        ))
-      )}
+    <div>
+      <h2 className="text-xl font-bold mb-2">📦 Handover</h2>
+      <ul>
+        {resolvedHandovers.map((h) => (
+          <li key={h.id}>
+            {h.description ?? h.name ?? 'No description'} - {h.status}
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }

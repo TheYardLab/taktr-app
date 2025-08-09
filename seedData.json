@@ -1,0 +1,72 @@
+{
+  "testProject1": {
+    "name": "Test Project Alpha",
+    "createdAt": {
+      "__datatype__": "timestamp",
+      "value": "2025-08-04T00:00:00.000Z"
+    },
+    "tasks": {
+      "task1": {
+        "id": "task1",
+        "name": "Prepare Site",
+        "status": "In Progress",
+        "type": "General",
+        "description": "Initial setup and mobilization"
+      },
+      "task2": {
+        "id": "task2",
+        "name": "Pour Foundation",
+        "status": "Not Started",
+        "type": "Concrete",
+        "description": "Concrete work for base foundation"
+      },
+      "task3": {
+        "id": "task3",
+        "name": "Install Framing",
+        "status": "Pending",
+        "type": "Structural",
+        "description": "Framing installation for structure"
+      }
+    },
+    "metrics": {
+      "metric1": {
+        "name": "Schedule Performance",
+        "value": 90,
+        "plannedValues": [100, 90, 80, 70],
+        "actualValues": [95, 88, 75, 65]
+      },
+      "metric2": {
+        "name": "Cost Performance",
+        "value": 85,
+        "plannedValues": [100, 95, 90, 85],
+        "actualValues": [98, 92, 87, 83]
+      }
+    },
+    "handovers": {
+      "handover1": {
+        "id": "handover1",
+        "description": "Electrical to Mechanical",
+        "status": "Pending"
+      },
+      "handover2": {
+        "id": "handover2",
+        "description": "Mechanical to Finishing",
+        "status": "Not Started"
+      }
+    },
+    "scurve": {
+      "point1": {
+        "date": "2025-08-04",
+        "value": 70,
+        "planned": 75,
+        "actual": 68
+      },
+      "point2": {
+        "date": "2025-08-11",
+        "value": 80,
+        "planned": 85,
+        "actual": 78
+      }
+    }
+  }
+}

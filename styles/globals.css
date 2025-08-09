@@ -1,29 +1,37 @@
-:root {
-  --brand-bg: #f4f4f4; /* Replace with your logo background color */
-}
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* 🔹 Global Body Styling */
-html, body {
-  height: 100%;
-  background-color: var(--brand-bg);
-  margin: 0;
+html,
+body {
   padding: 0;
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Oxygen,
+    Ubuntu, Cantarell, Fira Sans, Droid Sans, Helvetica Neue, sans-serif;
+  background-color: theme('colors.primary');
 }
 
-/* 🔹 Scrollbar styling (optional, for cleaner look) */
-::-webkit-scrollbar {
-  width: 8px;
+* {
+  box-sizing: border-box;
 }
 
-::-webkit-scrollbar-thumb {
-  background: #ccc;
-  border-radius: 4px;
+a {
+  color: inherit;
+  text-decoration: none;
 }
 
-::-webkit-scrollbar-thumb:hover {
-  background: #aaa;
+button {
+  @apply px-4 py-2 rounded-lg font-medium transition;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5 {
+  @apply font-bold text-primary;
+}
+
+.card {
+  @apply bg-surface shadow rounded-lg p-4;
 }

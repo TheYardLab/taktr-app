@@ -1,7 +1,12 @@
-export function formatDate(date: Date): string {
-  return date.toLocaleDateString();
-}
+// lib/utils.ts
+import { type ClassValue, clsx } from "clsx";
+import { twMerge } from "tailwind-merge";
 
-export function capitalizeFirstLetter(str: string): string {
-  return str.charAt(0).toUpperCase() + str.slice(1);
+/**
+ * Combines Tailwind classes with conditional logic.
+ * - Uses clsx to conditionally include class names.
+ * - Uses tailwind-merge to resolve class conflicts (e.g., "px-2" vs "px-4").
+ */
+export function cn(...inputs: ClassValue[]) {
+  return twMerge(clsx(inputs));
 }

@@ -1,0 +1,25 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{db}/documents {
+
+    // each user can read/write their own profile
+    match /users/{uid} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+    }
+
+    // project doc itself
+    match /projects/{projectId} {
+      allow read, write: if request.auth != null && (
+        resource.data.members[request.auth.uid] == true ||
+        request.resource.data.ownerId == request.auth.uid
+      );
+    }
+
+    // tasks under a project: only members of that project
+    match /projects/{projectId}/tasks/{taskId} {
+      allow read, write: if request.auth != null &&
+        get(/databases/$(db)/documents/projects/$(projectId))
+          .data.members[request.auth.uid] == true;
+    }
+  }
+}
