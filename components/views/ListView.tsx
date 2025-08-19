@@ -1,56 +1,52 @@
-// components/views/ListView.tsx
-'use client';
+import React from "react";
 
-import React from 'react';
-import { useTasksStore } from '@/components/hooks/useTasksStore';
+// replace local Task type with this more flexible one
+export type Task = {
+  id: string;
+  name: string;
+  startDate?: string;
+  endDate?: string;
+  status?: string; // << allow any string
+};
 
-interface ListViewProps {
-  projectId: string;
-}
+export type ListViewProps = {
+  tasks: Task[];
+};
 
-export default function ListView({ projectId }: ListViewProps) {
-  const { filteredTasks, loading, error, fetchTasks, setProjectId } = useTasksStore();
+export default function ListView({ tasks }: ListViewProps) {
+  const rows = React.useMemo(
+    () =>
+      (tasks || []).map((t) => ({
+        ...t,
+        status: t.status === "Completed" ? ("Done" as const) : t.status,
+      })),
+    [tasks]
+  );
 
-  React.useEffect(() => {
-    setProjectId(projectId);
-    fetchTasks();
-    // Cleanup when component unmounts
-    return () => {
-      setProjectId(null);
-    };
-  }, [projectId, fetchTasks, setProjectId]);
-
-  if (loading) {
-    return <div className="p-4">Loading tasks...</div>;
-  }
-
-  if (error) {
-    return <div className="p-4 text-red-500">Error: {error}</div>;
-  }
-
-  if (!filteredTasks.length) {
-    return <div className="p-4">No tasks found for this project.</div>;
+  if (!rows.length) {
+    return <div className="text-sm text-gray-500">No tasks to list.</div>;
   }
 
   return (
-    <div className="p-4">
-      <h2 className="text-lg font-semibold mb-4">Task List</h2>
-      <table className="min-w-full border-collapse border border-gray-300">
+    <div className="overflow-x-auto">
+      <table className="w-full min-w-[720px] text-sm">
         <thead>
-          <tr>
-            <th className="border border-gray-300 p-2">Task Name</th>
-            <th className="border border-gray-300 p-2">Status</th>
-            <th className="border border-gray-300 p-2">Start Date</th>
-            <th className="border border-gray-300 p-2">End Date</th>
+          <tr className="border-b text-left">
+            <th className="py-2 pr-3">Task</th>
+            <th className="py-2 pr-3">Status</th>
+            <th className="py-2 pr-3">Start</th>
+            <th className="py-2 pr-3">End</th>
+            <th className="py-2 pr-3">ID</th>
           </tr>
         </thead>
         <tbody>
-          {filteredTasks.map((task) => (
-            <tr key={task.id}>
-              <td className="border border-gray-300 p-2">{task.name}</td>
-              <td className="border border-gray-300 p-2">{task.status ?? 'Not Started'}</td>
-              <td className="border border-gray-300 p-2">{task.startDate ?? '-'}</td>
-              <td className="border border-gray-300 p-2">{task.endDate ?? '-'}</td>
+          {rows.map((t) => (
+            <tr key={t.id} className="border-b">
+              <td className="py-2 pr-3">{t.name}</td>
+              <td className="py-2 pr-3">{t.status || "Not Started"}</td>
+              <td className="py-2 pr-3">{t.startDate?.slice(0, 10) || "—"}</td>
+              <td className="py-2 pr-3">{t.endDate?.slice(0, 10) || "—"}</td>
+              <td className="py-2 pr-3 text-neutral-500">{t.id}</td>
             </tr>
           ))}
         </tbody>

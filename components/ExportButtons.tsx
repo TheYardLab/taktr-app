@@ -1,35 +1,30 @@
-'use client';
-import React, { useState } from 'react';
-import { useProjectContext } from '@/lib/ProjectContext';
-import ExportModal from './ExportModal';
-import { exportProjectAsPDF, exportProjectAsCSV } from '@/lib/exportUtils';
+import React from "react";
+import { useTasksStore, type Task } from "@/components/hooks/useTasksStore";
 
-export default function ExportButtons() {
-  const { activeProject } = useProjectContext();
-  const [isModalOpen, setIsModalOpen] = useState(false);
+const ExportButtons: React.FC = () => {
+  const tasks = useTasksStore((state) => state.tasks) as Task[];
 
-  if (!activeProject) return null;
+  const exportToCSV = () => {
+    const csv = [
+      ["Name", "Start Date", "End Date", "Status"],
+      ...tasks.map((t) => [t.name, t.startDate || "", t.endDate || "", t.status]),
+    ]
+      .map((row) => row.join(","))
+      .join("\n");
+
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "tasks.csv";
+    link.click();
+  };
 
   return (
-    <>
-      <button
-        onClick={() => setIsModalOpen(true)}
-        className="bg-gray-800 text-white px-4 py-2 rounded hover:bg-gray-900"
-      >
-        Export
-      </button>
-      <ExportModal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        onExportPDF={() => {
-          exportProjectAsPDF(activeProject);
-          setIsModalOpen(false);
-        }}
-        onExportCSV={() => {
-          exportProjectAsCSV(activeProject);
-          setIsModalOpen(false);
-        }}
-      />
-    </>
+    <div>
+      <button onClick={exportToCSV}>Export CSV</button>
+    </div>
   );
-}
+};
+
+export default ExportButtons;

@@ -1,31 +1,25 @@
 import React from "react";
-import { useProjectContext, type Handover } from "@/lib/ProjectContext";
+import { useTasksStore, type Task } from "@/components/hooks/useTasksStore";
 
-interface HandoverComponentProps {
-  handovers?: Handover[];
-}
-
-export default function HandoverComponent({ handovers }: HandoverComponentProps) {
-  const { activeProject } = useProjectContext();
-
-  // Prefer prop if provided, fallback to context
-  const resolvedHandovers: Handover[] =
-    handovers ?? activeProject?.handovers ?? [];
-
-  if (!resolvedHandovers.length) {
-    return <div>No handover data available</div>;
-  }
+const Handover: React.FC = () => {
+  const tasks = (useTasksStore((state) => state.filteredTasks) ?? []) as Task[];
 
   return (
     <div>
-      <h2 className="text-xl font-bold mb-2">📦 Handover</h2>
-      <ul>
-        {resolvedHandovers.map((h) => (
-          <li key={h.id}>
-            {h.description ?? h.name ?? 'No description'} - {h.status}
-          </li>
-        ))}
-      </ul>
+      <h2>Handover</h2>
+      {tasks.length === 0 ? (
+        <p>No tasks to hand over.</p>
+      ) : (
+        <ul>
+          {tasks.map((t) => (
+            <li key={t.id}>
+              {t.name ?? "Untitled"} — {t.startDate ?? "—"} → {t.endDate ?? "—"}
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
-}
+};
+
+export default Handover;

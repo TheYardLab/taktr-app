@@ -1,24 +1,7 @@
 // components/hooks/useTasksStore.ts
 import { create } from "zustand";
-import {
-  addDoc,
-  collection,
-  doc,
-  onSnapshot,
-  orderBy,
-  query,
-  serverTimestamp,
-  updateDoc,
-  writeBatch,
-  Unsubscribe,
-} from "firebase/firestore";
-import { db } from "@/lib/firebase";
 
-/**
- * Keep TaskStatus broad enough to interop with all views.
- * (Gantt expects "Not Started" | "In Progress" | "Blocked" | "Done")
- * You may also still have "Completed" in older data.
- */
+/** Keep this union in sync with your views (Gantt/List/etc). */
 export type TaskStatus =
   | "Not Started"
   | "In Progress"
@@ -26,223 +9,93 @@ export type TaskStatus =
   | "Done"
   | "Completed";
 
-export interface Task {
+/** Tasks coming from Firestore or uploads. Keep fields loose/flexible. */
+export type Task = {
   id: string;
-  projectId: string;   // REQUIRED for persistence & filtering
+  projectId?: string;
   name: string;
-  status?: TaskStatus;
-  startDate?: string;  // ISO "YYYY-MM-DD" or full ISO
-  endDate?: string;    // ISO
-}
-
-// ---------- Helpers ----------
-const asDate = (value?: string) => (value ? new Date(value) : undefined);
-
-const compareBy = (
-  a: Task,
-  b: Task,
-  sortBy: "startDate" | "endDate" | "status" | "name"
-) => {
-  if (sortBy === "startDate" || sortBy === "endDate") {
-    const da = asDate(a[sortBy]);
-    const dbv = asDate(b[sortBy]);
-    if (!da && !dbv) return 0;
-    if (!da) return 1;
-    if (!dbv) return -1;
-    return da.getTime() - dbv.getTime();
-  }
-  // status / name
-  return (a[sortBy] ?? "").localeCompare(b[sortBy] ?? "");
+  status?: TaskStatus | string;
+  startDate?: any; // string | Date | Firestore Timestamp
+  endDate?: any;   // string | Date | Firestore Timestamp
+  [key: string]: any;
 };
 
-// ---------- Store ----------
-interface TasksStore {
-  // state
+export type TasksStore = {
+  // project meta
   projectId: string | null;
-  tasks: Task[];
-  filteredTasks: Task[];
-  sortBy: "startDate" | "endDate" | "status" | "name";
+  projectMeta: { name: string | null } | null;
+
+  // task data
+  tasks: Task[];           // raw tasks for the selected project
+  filteredTasks: Task[];   // filtered/sorted list for UI
   filterBy: string;
-  loading: boolean;
-  error: string | null;
 
   // actions
-  setProjectId: (projectId: string | null) => void;
-  setSortBy: (sortBy: TasksStore["sortBy"]) => void;
-  setFilter: (filterBy: string) => void;
+  setProjectId: (id: string | null) => void;
+  setProjectMeta: (id: string | null, name: string | null) => void;
 
-  fetchTasks: () => void; // subscribes to current project's subcollection
-  addTask: (task: Omit<Task, "id">) => Promise<string>;
-  addMany: (tasks: Omit<Task, "id">[]) => Promise<void>;
-  updateTask: (taskId: string, updates: Partial<Task>) => Promise<void>;
-  clear: () => void;
+  /** Placeholder – wire your Firestore query here later */
+  fetchTasks: () => Promise<void>;
+
+  /** Push new tasks into the store (also refreshes filteredTasks) */
+  setTasks: (tasks: Task[]) => void;
+
+  /** Update filter and recompute filteredTasks */
+  setFilter: (term: string) => void;
+};
+
+function applyFilter(tasks: Task[], term: string): Task[] {
+  if (!term) return tasks.slice();
+  const q = term.toLowerCase();
+  return tasks.filter((t) => {
+    const name = (t.name ?? "").toLowerCase();
+    const status = (String(t.status ?? "")).toLowerCase();
+    return name.includes(q) || status.includes(q);
+  });
 }
 
-export const useTasksStore = create<TasksStore>((set, get) => {
-  let unsubscribe: Unsubscribe | null = null;
+export const useTasksStore = create<TasksStore>((set, get) => ({
+  // state
+  projectId: null,
+  projectMeta: null,
+  tasks: [],
+  filteredTasks: [],
+  filterBy: "",
 
-  const reapplyFilters = (tasks: Task[]) => {
-    const { filterBy, sortBy } = get();
-    let list = tasks;
+  // actions
+  setProjectId: (id) => set({ projectId: id }),
 
-    if (filterBy) {
-      const term = filterBy.toLowerCase();
-      list = list.filter(
-        (t) =>
-          t.name.toLowerCase().includes(term) ||
-          (t.status ?? "").toLowerCase().includes(term)
-      );
-    }
+  setProjectMeta: (_id, name) => set({ projectMeta: { name } }),
 
-    list = [...list].sort((a, b) => compareBy(a, b, sortBy));
-    set({ tasks, filteredTasks: list, loading: false, error: null });
-  };
+  fetchTasks: async () => {
+    // Wire Firestore here when you’re ready:
+    // const { projectId } = get();
+    // if (!projectId) return;
+    // const snap = await getDocs(query(collection(db, "tasks"), where("projectId", "==", projectId)));
+    // const tasks: Task[] = snap.docs.map(d => ({ id: d.id, ...(d.data() as any) }));
+    // get().setTasks(tasks);
 
-  return {
-    projectId: null,
-    tasks: [],
-    filteredTasks: [],
-    sortBy: "startDate",
-    filterBy: "",
-    loading: false,
-    error: null,
+    // Temporary no-op so callers don’t crash
+    return;
+  },
 
-    setProjectId: (projectId) => {
-      // tear down previous listener
-      if (unsubscribe) {
-        unsubscribe();
-        unsubscribe = null;
-      }
-      set({ projectId, tasks: [], filteredTasks: [] });
-      // call fetchTasks() after this to wire up the new listener
-    },
+  setTasks: (tasks) => {
+    const term = get().filterBy;
+    set({
+      tasks,
+      filteredTasks: applyFilter(tasks, term),
+    });
+  },
 
-    setSortBy: (sortBy) => {
-      const tasks = [...get().tasks].sort((a, b) => compareBy(a, b, sortBy));
-      set({ sortBy, filteredTasks: tasks });
-    },
+  setFilter: (term) => {
+    const { tasks } = get();
+    set({
+      filterBy: term,
+      filteredTasks: applyFilter(tasks, term),
+    });
+  },
+}));
 
-    setFilter: (filterBy) => {
-      const { tasks, sortBy } = get();
-      const term = filterBy.toLowerCase();
-      const filtered = term
-        ? tasks.filter(
-            (t) =>
-              t.name.toLowerCase().includes(term) ||
-              (t.status ?? "").toLowerCase().includes(term)
-          )
-        : tasks;
-      set({
-        filterBy,
-        filteredTasks: [...filtered].sort((a, b) => compareBy(a, b, sortBy)),
-      });
-    },
-
-    /**
-     * Subscribe to tasks under projects/{projectId}/tasks
-     * (matches what your uploader/API writes)
-     */
-    fetchTasks: () => {
-      const projectId = get().projectId;
-
-      if (!projectId) {
-        set({
-          tasks: [],
-          filteredTasks: [],
-          loading: false,
-          error: null,
-        });
-        if (unsubscribe) {
-          unsubscribe();
-          unsubscribe = null;
-        }
-        return;
-      }
-
-      set({ loading: true, error: null });
-
-      const tasksRef = collection(db, "projects", projectId, "tasks");
-      const q = query(tasksRef, orderBy("startDate"));
-
-      if (unsubscribe) unsubscribe();
-      unsubscribe = onSnapshot(
-        q,
-        (snap) => {
-          const tasks: Task[] = snap.docs.map((d) => ({
-            id: d.id,
-            ...(d.data() as Omit<Task, "id">),
-          }));
-          reapplyFilters(tasks);
-        },
-        (err) => set({ loading: false, error: err.message })
-      );
-    },
-
-    /**
-     * Client-side add to the subcollection.
-     * (Your server-side CSV upload already writes here as well.)
-     */
-    addTask: async (task) => {
-      if (!task.projectId) throw new Error("projectId is required on task");
-      const ref = await addDoc(
-        collection(db, "projects", task.projectId, "tasks"),
-        {
-          ...task,
-          createdAt: serverTimestamp(),
-          updatedAt: serverTimestamp(),
-        }
-      );
-      return ref.id;
-    },
-
-    addMany: async (tasks) => {
-      if (!tasks.length) return;
-
-      // Group by projectId to batch per subcollection
-      const groups = new Map<string, Omit<Task, "id">[]>();
-      for (const t of tasks) {
-        if (!t.projectId) throw new Error("projectId is required on each task");
-        const arr = groups.get(t.projectId) || [];
-        arr.push(t);
-        groups.set(t.projectId, arr);
-      }
-
-      for (const [projectId, arr] of groups.entries()) {
-        const batch = writeBatch(db);
-        for (const t of arr) {
-          const ref = doc(collection(db, "projects", projectId, "tasks"));
-          batch.set(ref, {
-            ...t,
-            createdAt: serverTimestamp(),
-            updatedAt: serverTimestamp(),
-          });
-        }
-        await batch.commit();
-      }
-    },
-
-    updateTask: async (taskId, updates) => {
-      const projectId = get().projectId;
-      if (!projectId) throw new Error("No active project");
-      const taskRef = doc(db, "projects", projectId, "tasks", taskId);
-      await updateDoc(taskRef, {
-        ...updates,
-        updatedAt: serverTimestamp(),
-      });
-    },
-
-    clear: () => {
-      if (unsubscribe) {
-        unsubscribe();
-        unsubscribe = null;
-      }
-      set({
-        tasks: [],
-        filteredTasks: [],
-        filterBy: "",
-        loading: false,
-        error: null,
-      });
-    },
-  };
-});
+// Re-export types so existing imports like
+// `import { Task } from "@/components/hooks/useTasksStore"` continue to work.
+export type { Task as DefaultTask };

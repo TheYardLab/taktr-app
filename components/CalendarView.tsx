@@ -1,117 +1,170 @@
-// components/CalendarView.tsx
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useRef } from "react";
 
 type Task = {
   id: string;
   name: string;
-  startDate?: string;
-  endDate?: string;
+  startDate?: string; // ISO (YYYY-MM-DD or full ISO)
+  endDate?: string;   // ISO
   status?: "Not Started" | "In Progress" | "Blocked" | "Done" | "Completed";
 };
 
-const ONE_DAY = 1000 * 60 * 60 * 24;
+type Props = {
+  tasks: Task[];
+  /** optional YYYY-MM for which month to render; defaults to current month */
+  month?: string;
+};
 
-function startOfMonth(d: Date) {
+function ymd(date: Date) {
+  return date.toISOString().slice(0, 10);
+}
+function strip(d: Date) {
   const x = new Date(d);
-  x.setDate(1); x.setHours(0,0,0,0);
+  x.setHours(0,0,0,0);
   return x;
 }
-function endOfMonth(d: Date) {
-  const x = new Date(d);
-  x.setMonth(x.getMonth() + 1, 0); x.setHours(0,0,0,0);
-  return x;
-}
-function isBetween(day: Date, a?: string, b?: string) {
-  if (!a || !b) return false;
-  const t = day.getTime();
-  const s = new Date(a).setHours(0,0,0,0);
-  const e = new Date(b).setHours(0,0,0,0);
-  return t >= s && t <= e;
+function parseISOish(v?: string) {
+  if (!v) return undefined;
+  const d = new Date(v);
+  return isNaN(d.getTime()) ? undefined : strip(d);
 }
 
-export default function CalendarView({ tasks }: { tasks: Task[] }) {
-  const [anchor, setAnchor] = useState(() => startOfMonth(new Date()));
-  const end = endOfMonth(anchor);
+export default function CalendarView({ tasks, month }: Props) {
+  const containerRef = useRef<HTMLDivElement>(null);
 
-  const days = useMemo(() => {
-    const span = Math.round((end.getTime() - anchor.getTime()) / ONE_DAY) + 1;
-    return Array.from({ length: span }, (_, i) => new Date(anchor.getTime() + i * ONE_DAY));
-  }, [anchor, end]);
+  // Which month?
+  const base = useMemo(() => {
+    if (month && /^\d{4}-\d{2}$/.test(month)) {
+      const [y, m] = month.split("-").map(Number);
+      return new Date(y, m - 1, 1);
+    }
+    const now = new Date();
+    return new Date(now.getFullYear(), now.getMonth(), 1);
+  }, [month]);
 
-  const normalized = (tasks || []).map((t) => ({
-    ...t,
-    status: t.status === "Completed" ? "Done" : (t.status ?? "Not Started"),
-  }));
+  // Build month grid (Sun → Sat)
+  const { title, days } = useMemo(() => {
+    const year = base.getFullYear();
+    const monthIdx = base.getMonth();
+    const monthStart = new Date(year, monthIdx, 1);
+    const monthEnd = new Date(year, monthIdx + 1, 0);
+    const startOfGrid = new Date(monthStart);
+    startOfGrid.setDate(monthStart.getDate() - monthStart.getDay()); // Sunday
+    const endOfGrid = new Date(monthEnd);
+    endOfGrid.setDate(monthEnd.getDate() + (6 - monthEnd.getDay())); // Saturday
 
-  const color = (s?: string) =>
-    s === "Done" ? "bg-emerald-500"
-    : s === "In Progress" ? "bg-blue-500"
-    : s === "Blocked" ? "bg-red-500"
-    : "bg-gray-400";
+    const grid: Date[] = [];
+    const cur = new Date(startOfGrid);
+    while (cur <= endOfGrid) {
+      grid.push(new Date(cur));
+      cur.setDate(cur.getDate() + 1);
+    }
+
+    const monthName = monthStart.toLocaleString(undefined, { month: "long", year: "numeric" });
+    return { title: monthName, days: grid.map(strip) };
+  }, [base]);
+
+  // Map tasks to active days in this month
+  const byDay = useMemo(() => {
+    const map = new Map<string, Task[]>();
+    tasks.forEach((t) => {
+      const s = parseISOish(t.startDate);
+      const e = parseISOish(t.endDate);
+      if (!s || !e) return;
+      // walk from s..e, but only put items that land in our grid
+      const cur = new Date(s);
+      while (cur <= e) {
+        const key = ymd(cur);
+        map.set(key, [...(map.get(key) || []), t]);
+        cur.setDate(cur.getDate() + 1);
+      }
+    });
+    return map;
+  }, [tasks]);
+
+  function exportCSV() {
+    const rows = [
+      ["id", "name", "status", "startDate", "endDate"],
+      ...tasks.map((t) => [
+        t.id,
+        t.name,
+        // normalize “Completed” to “Done” so exports are consistent
+        t.status === "Completed" ? "Done" : (t.status ?? "Not Started"),
+        t.startDate ?? "",
+        t.endDate ?? "",
+      ]),
+    ];
+    const csv = rows.map((r) =>
+      r.map((v) => `"${String(v ?? "").replace(/"/g, '""')}"`).join(",")
+    ).join("\n");
+
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `calendar-export-${title.replace(/\s+/g, "-").toLowerCase()}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function printPDF() {
+    // Simple, robust approach: print the section; use your global @media print to format
+    window.print();
+  }
 
   return (
-    <div>
-      {/* Controls */}
-      <div className="mb-2 flex items-center gap-2">
-        <button
-          className="rounded border px-2 py-1"
-          onClick={() => {
-            const d = new Date(anchor);
-            d.setMonth(d.getMonth() - 1);
-            setAnchor(startOfMonth(d));
-          }}
-        >
-          ← Prev
-        </button>
-        <div className="text-sm font-medium">
-          {anchor.toLocaleString(undefined, { month: "long", year: "numeric" })}
+    <section ref={containerRef} className="rounded border p-4">
+      <div className="mb-3 flex items-center justify-between">
+        <h2 className="font-medium">{title}</h2>
+        <div className="flex items-center gap-2">
+          <button className="rounded bg-black px-3 py-1 text-white" onClick={exportCSV}>
+            Export CSV
+          </button>
+          <button className="rounded border px-3 py-1" onClick={printPDF}>
+            Print PDF
+          </button>
         </div>
-        <button
-          className="rounded border px-2 py-1"
-          onClick={() => {
-            const d = new Date(anchor);
-            d.setMonth(d.getMonth() + 1);
-            setAnchor(startOfMonth(d));
-          }}
-        >
-          Next →
-        </button>
       </div>
 
-      {/* Grid */}
-      <div className="overflow-x-auto">
-        <table className="min-w-[720px] w-full border text-sm">
-          <thead>
-            <tr className="bg-gray-50">
-              {days.map((d) => (
-                <th key={d.toISOString()} className="border px-1 py-1 text-[11px] font-medium">
-                  {d.getDate()}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {normalized.map((t) => (
-              <tr key={t.id} className="h-8">
-                {days.map((d) => (
-                  <td key={`${t.id}-${d.toISOString()}`} className="border p-0">
-                    {isBetween(d, t.startDate, t.endDate) && (
-                      <div className={`h-6 ${color(t.status)}`} title={`${t.name} (${t.status})`} />
-                    )}
-                  </td>
-                ))}
-              </tr>
-            ))}
-            {!normalized.length && (
-              <tr>
-                <td colSpan={days.length} className="p-3 text-center text-gray-500">
-                  No tasks this month
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
+      {/* Weekday header */}
+      <div className="grid grid-cols-7 text-xs text-gray-600">
+        {["Sun","Mon","Tue","Wed","Thu","Fri","Sat"].map((d) => (
+          <div key={d} className="px-2 py-1">{d}</div>
+        ))}
       </div>
-    </div>
+
+      {/* Month grid */}
+      <div className="grid grid-cols-7 gap-px bg-gray-200">
+        {days.map((d) => {
+          const dateKey = ymd(d);
+          const dayTasks = byDay.get(dateKey) || [];
+          const inMonth = d.getMonth() === base.getMonth();
+          return (
+            <div key={dateKey} className="min-h-[110px] bg-white p-2 align-top">
+              <div className={`mb-1 text-xs ${inMonth ? "text-gray-900" : "text-gray-400"}`}>
+                {d.getDate()}
+              </div>
+              <div className="space-y-1">
+                {dayTasks.slice(0, 4).map((t) => (
+                  <div
+                    key={`${dateKey}-${t.id}`}
+                    className="truncate rounded px-1 py-[2px] text-[11px]"
+                    style={{
+                      background: "#eef2ff", // subtle
+                      border: "1px solid #e5e7eb",
+                    }}
+                    title={`${t.name} (${t.startDate ?? "?"} → ${t.endDate ?? "?"})`}
+                  >
+                    {t.name}
+                  </div>
+                ))}
+                {dayTasks.length > 4 && (
+                  <div className="text-[11px] text-gray-500">+{dayTasks.length - 4} more…</div>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </section>
   );
 }

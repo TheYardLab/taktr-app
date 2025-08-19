@@ -1,0 +1,21 @@
+{
+  "files.exclude": {
+    "**/.next/**": true,
+    "**/dist/**": true,
+    "**/build/**": true,
+    "**/node_modules/**": true
+  },
+  "search.exclude": {
+    "**/.next/**": true,
+    "**/dist/**": true,
+    "**/build/**": true,
+    "**/node_modules/**": true
+  },
+  "tailwindCSS.files.exclude": [
+    "**/.next/**",
+    "**/dist/**",
+    "**/build/**",
+    "**/node_modules/**"
+  ],
+  "editor.defaultFormatter": null
+}

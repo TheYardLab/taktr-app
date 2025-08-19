@@ -1,74 +1,268 @@
 // components/SCurve.tsx
-import React, { useMemo } from "react";
+'use client';
 
+import React, { useEffect, useMemo, useState } from 'react';
+import { db } from '@/lib/firebase';
+import { collection, onSnapshot, orderBy, query } from 'firebase/firestore';
+
+type TSLike = { seconds: number; nanoseconds?: number };
 type Task = {
   id: string;
-  endDate?: string;
-  status?: "Not Started" | "In Progress" | "Blocked" | "Done" | "Completed";
+  name?: string;
+  // support both legacy and current field names
+  start?: TSLike | Date | string;
+  end?: TSLike | Date | string;           // legacy planned finish
+  startDate?: TSLike | Date | string;     // current planned start
+  endDate?: TSLike | Date | string;       // current planned finish
+  actualEnd?: TSLike | Date | string;     // optional actual finish
+  status?: string;
 };
 
-const ONE_DAY = 1000 * 60 * 60 * 24;
+function toDate(v?: TSLike | Date | string): Date | undefined {
+  if (!v) return undefined;
+  if (typeof v === 'string') {
+    const d = new Date(v);
+    return Number.isNaN(d.getTime()) ? undefined : d;
+  }
+  if (v instanceof Date) return v;
+  if (typeof (v as TSLike).seconds === 'number') {
+    return new Date((v as TSLike).seconds * 1000);
+  }
+  return undefined;
+}
 
-export default function SCurve({ tasks }: { tasks: Task[] }) {
-  const points = useMemo(() => {
-    const doneDates = (tasks || [])
-      .filter((t) => (t.status === "Done" || t.status === "Completed") && t.endDate)
-      .map((t) => new Date(t.endDate!))
-      .filter((d) => !Number.isNaN(d.getTime()))
-      .map((d) => {
-        const x = new Date(d);
-        x.setHours(0, 0, 0, 0);
-        return x.getTime();
-      })
-      .sort((a, b) => a - b);
+function startOfDay(d: Date): Date {
+  const x = new Date(d);
+  x.setHours(0, 0, 0, 0);
+  return x;
+}
 
-    if (!doneDates.length) return [] as Array<{ d: string; c: number }>;
+function addDays(d: Date, n: number): Date {
+  const x = new Date(d);
+  x.setDate(x.getDate() + n);
+  return x;
+}
 
-    const min = doneDates[0];
-    const max = doneDates[doneDates.length - 1];
-    const span = Math.max(1, Math.round((max - min) / ONE_DAY) + 1);
+function dateKey(d: Date): string {
+  return startOfDay(d).toISOString().slice(0, 10);
+}
 
-    const curve: Array<{ d: string; c: number }> = [];
-    let cumulative = 0;
-    for (let i = 0; i < span; i++) {
-      const day = min + i * ONE_DAY;
-      while (doneDates[0] !== undefined && doneDates[0] <= day) {
-        doneDates.shift();
-        cumulative++;
+type Props = {
+  /** Optional: if provided we render from these tasks and skip Firestore */
+  tasks?: Task[];
+  /** Optional: if provided (and no tasks prop), we stream tasks from Firestore */
+  projectId?: string;
+};
+
+export default function SCurve({ tasks: tasksProp, projectId }: Props) {
+  const [tasksFS, setTasksFS] = useState<Task[]>([]);
+
+  // If tasks are not passed in, and we have a projectId, load from Firestore
+  useEffect(() => {
+    if (tasksProp || !projectId) return;
+    // Try ordering by endDate first; if missing index the listener still works without orderBy
+    const col = collection(db, 'projects', projectId, 'tasks');
+    const q = query(col, orderBy('endDate', 'asc'));
+    const unsub = onSnapshot(
+      q,
+      snap => {
+        const rows: Task[] = snap.docs.map(d => ({ id: d.id, ...(d.data() as any) }));
+        setTasksFS(rows);
+      },
+      // If index for orderBy isn't available, gracefully fall back to unordered stream
+      () => {
+        const unsub2 = onSnapshot(col, snap2 => {
+          const rows: Task[] = snap2.docs.map(d => ({ id: d.id, ...(d.data() as any) }));
+          setTasksFS(rows);
+        });
+        // return fallback unsub on error path
+        return unsub2;
       }
-      curve.push({ d: new Date(day).toISOString().slice(0, 10), c: cumulative });
+    );
+    return () => unsub();
+  }, [tasksProp, projectId]);
+
+  const tasks = tasksProp ?? tasksFS;
+
+  const { days, planned, actual, maxY } = useMemo(() => {
+    if (!tasks || tasks.length === 0) {
+      return { days: [] as Date[], planned: [] as number[], actual: [] as number[], maxY: 0 };
     }
-    return curve;
+
+    // Collect planned & actual dates, supporting both legacy (end) and current (endDate) fields
+    const plannedDates: Date[] = [];
+    const actualDates: Date[] = [];
+
+    for (const t of tasks) {
+      const plannedFinish = toDate(t.endDate ?? t.end);
+      if (plannedFinish) plannedDates.push(startOfDay(plannedFinish));
+
+      // actual — use explicit actualEnd if present, otherwise if status is done/completed use planned finish
+      const s = (t.status || '').toLowerCase();
+      const isDone = s === 'done' || s === 'completed';
+      const actualFinish = toDate(t.actualEnd) ?? (isDone ? plannedFinish : undefined);
+      if (actualFinish) actualDates.push(startOfDay(actualFinish));
+    }
+
+    if (plannedDates.length === 0 && actualDates.length === 0) {
+      return { days: [] as Date[], planned: [] as number[], actual: [] as number[], maxY: 0 };
+    }
+
+    plannedDates.sort((a, b) => a.getTime() - b.getTime());
+    actualDates.sort((a, b) => a.getTime() - b.getTime());
+
+    const minDate = new Date(
+      Math.min(
+        plannedDates.length ? plannedDates[0].getTime() : Infinity,
+        actualDates.length ? actualDates[0].getTime() : Infinity
+      )
+    );
+    const maxDate = new Date(
+      Math.max(
+        plannedDates.length ? plannedDates[plannedDates.length - 1].getTime() : -Infinity,
+        actualDates.length ? actualDates[actualDates.length - 1].getTime() : -Infinity
+      )
+    );
+
+    if (!(minDate.getTime() <= maxDate.getTime())) {
+      return { days: [] as Date[], planned: [] as number[], actual: [] as number[], maxY: 0 };
+    }
+
+    // Build continuous day range
+    const range: Date[] = [];
+    let cursor = startOfDay(minDate);
+    while (cursor <= maxDate) {
+      range.push(new Date(cursor));
+      cursor = addDays(cursor, 1);
+    }
+
+    // Daily counts → cumulative
+    const plannedCountByDay = new Map<string, number>();
+    for (const d of plannedDates) {
+      const k = dateKey(d);
+      plannedCountByDay.set(k, (plannedCountByDay.get(k) || 0) + 1);
+    }
+    const actualCountByDay = new Map<string, number>();
+    for (const d of actualDates) {
+      const k = dateKey(d);
+      actualCountByDay.set(k, (actualCountByDay.get(k) || 0) + 1);
+    }
+
+    const plannedCum: number[] = [];
+    const actualCum: number[] = [];
+    let pSum = 0;
+    let aSum = 0;
+    for (const d of range) {
+      const k = dateKey(d);
+      pSum += plannedCountByDay.get(k) || 0;
+      aSum += actualCountByDay.get(k) || 0;
+      plannedCum.push(pSum);
+      actualCum.push(aSum);
+    }
+
+    const maxYVal = Math.max(plannedCum.at(-1) || 0, actualCum.at(-1) || 0);
+    return { days: range, planned: plannedCum, actual: actualCum, maxY: maxYVal };
   }, [tasks]);
 
-  if (!points.length) return <div className="text-sm text-gray-500">No completed tasks yet.</div>;
+  // Empty states
+  if (!tasksProp && !projectId) {
+    return <div className="text-sm text-gray-500">Provide tasks or a projectId to render the S-Curve.</div>;
+  }
+  if (!tasks || tasks.length === 0) {
+    return (
+      <div className="rounded border border-dashed p-4 text-sm text-gray-500">
+        No tasks with finish dates found. Import a schedule or add tasks to see the S-Curve.
+      </div>
+    );
+  }
 
-  // very simple line using CSS (no libs)
-  // x = index, y = cumulative
-  const maxC = points[points.length - 1].c;
-  const height = 160;
-  const width = Math.max(320, points.length * 8);
+  // --- Simple responsive SVG chart ---
+  const width = 900;
+  const height = 320;
+  const margin = { top: 16, right: 16, bottom: 36, left: 44 };
+  const innerW = width - margin.left - margin.right;
+  const innerH = height - margin.top - margin.bottom;
 
-  const path = (() => {
-    const toY = (c: number) => height - (c / maxC) * (height - 20) - 10;
-    const toX = (i: number) => 10 + i * (width / Math.max(1, points.length - 1));
-    return points
-      .map((p, i) => `${i === 0 ? "M" : "L"} ${toX(i)} ${toY(p.c)}`)
-      .join(" ");
-  })();
+  const x = (i: number) => (i / Math.max(1, days.length - 1)) * innerW;
+  const y = (v: number) => innerH - (v / Math.max(1, maxY)) * innerH;
+
+ 
+
+// WITH this
+const plannedPath =
+  planned.length === 0
+    ? ''
+    : planned
+        .map((v, i) => `${i === 0 ? 'M' : 'L'} ${x(i).toFixed(2)} ${y(v).toFixed(2)}`)
+        .join(' ');
+
+
+// WITH this
+const actualPath =
+  actual.length === 0
+    ? ''
+    : actual
+        .map((v, i) => `${i === 0 ? 'M' : 'L'} ${x(i).toFixed(2)} ${y(v).toFixed(2)}`)
+        .join(' ');
+
+  const yTicks = 5;
+  const xTicks = Math.min(8, Math.max(1, days.length - 1));
 
   return (
-    <div className="overflow-x-auto">
-      <svg width={width} height={height} className="border rounded bg-white">
-        {/* axes */}
-        <line x1="10" y1={height - 10} x2={width - 10} y2={height - 10} stroke="#e5e7eb" />
-        <line x1="10" y1="10" x2="10" y2={height - 10} stroke="#e5e7eb" />
-        {/* path */}
-        <path d={path} fill="none" stroke="#0ea5e9" strokeWidth="2" />
-        {/* last label */}
-        <text x={width - 50} y={20} fontSize="10" fill="#374151">
-          Total: {maxC}
-        </text>
+    <div className="overflow-auto rounded border bg-white p-3">
+      <div className="mb-2 flex items-center justify-between">
+        <div className="text-sm font-medium text-gray-700">
+          S-Curve (Cumulative Planned vs Actual)
+        </div>
+        <div className="flex items-center gap-3 text-xs">
+          <span className="inline-flex items-center gap-1">
+            <span className="inline-block h-2 w-4 rounded-sm bg-blue-600" /> Planned
+          </span>
+          <span className="inline-flex items-center gap-1">
+            <span className="inline-block h-2 w-4 rounded-sm bg-green-600" /> Actual
+          </span>
+        </div>
+      </div>
+
+      <svg width={width} height={height} role="img" aria-label="S-Curve chart">
+        <g transform={`translate(${margin.left},${margin.top})`}>
+          {/* Y grid & ticks */}
+          {Array.from({ length: yTicks + 1 }, (_, i) => {
+            const v = (i / yTicks) * maxY;
+            const yy = y(v);
+            return (
+              <g key={`y-${i}`}>
+                <line x1={0} x2={innerW} y1={yy} y2={yy} stroke="#e5e7eb" />
+                <text x={-8} y={yy} textAnchor="end" dominantBaseline="middle" fontSize="10" fill="#6b7280">
+                  {Math.round(v)}
+                </text>
+              </g>
+            );
+          })}
+
+          {/* X ticks */}
+          {Array.from({ length: xTicks + 1 }, (_, i) => {
+            const idx = Math.round((i / xTicks) * (days.length - 1));
+            const dd = days[idx];
+            const xx = x(idx);
+            return (
+              <g key={`x-${i}`}>
+                <line x1={xx} x2={xx} y1={0} y2={innerH} stroke="#f3f4f6" />
+                <text x={xx} y={innerH + 16} textAnchor="middle" fontSize="10" fill="#6b7280">
+                  {dd.toLocaleDateString()}
+                </text>
+              </g>
+            );
+          })}
+
+          {/* Axes */}
+          <line x1={0} x2={innerW} y1={innerH} y2={innerH} stroke="#9ca3af" />
+          <line x1={0} x2={0} y1={0} y2={innerH} stroke="#9ca3af" />
+
+          {/* Lines */}
+          <path d={plannedPath} fill="none" stroke="#2563eb" strokeWidth={2} />
+          <path d={actualPath} fill="none" stroke="#16a34a" strokeWidth={2} />
+        </g>
       </svg>
     </div>
   );

@@ -1,5 +1,10 @@
 import React from "react";
-import { useProjectContext } from "@/lib/ProjectContext";
+import * as PC from "@/lib/ProjectContext";
+
+// Shim: prefer exported hook, otherwise derive from exported context
+const useProjectContext: () => { metrics?: { name: string; value: string | number }[] } =
+  (PC as any).useProjectContext ??
+  (() => React.useContext((PC as any).ProjectContext));
 
 type MetricsItem = { name: string; value: string | number };
 
@@ -9,7 +14,7 @@ interface MetricsProps {
 
 export default function Metrics({ metrics }: MetricsProps) {
   // ProjectContext may or may not provide metrics; tolerate undefined.
-  const ctx = useProjectContext?.() as { metrics?: MetricsItem[] } | undefined;
+  const ctx = useProjectContext() as { metrics?: MetricsItem[] } | undefined;
   const data: MetricsItem[] = metrics ?? ctx?.metrics ?? [];
 
   if (!data || data.length === 0) {

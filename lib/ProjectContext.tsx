@@ -1,40 +1,37 @@
-// lib/ProjectContext.tsx
-import React, {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
-import { app } from "@/lib/firebase";
+
+"use client";
+
+import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
+import type { Timestamp } from "firebase/firestore";
+import { onAuthStateChanged, getAuth, User } from "firebase/auth";
 import {
-  getAuth,
-  onAuthStateChanged,
-  User as FirebaseUser,
-} from "firebase/auth";
-import {
-  getFirestore,
   collection,
+  doc,
+  getDoc,
   onSnapshot,
   query,
   where,
+  Unsubscribe,
+  setDoc,
   addDoc,
+  deleteDoc,
   serverTimestamp,
-  DocumentData,
 } from "firebase/firestore";
+import { db, app } from "@/lib/firebase";
 
-export type TaskStatus = "Not Started" | "In Progress" | "Blocked" | "Done" | "Completed";
-
+// ---------- Types ----------
 export type Task = {
   id: string;
-  projectId: string;
   name: string;
-  status?: TaskStatus;
-  startDate?: string; // ISO
-  endDate?: string;   // ISO
-  updatedAt?: string;
+  zone?: string;
+  trade?: string;
+  status?: string;
+  start?: Timestamp | Date | null;
+  end?: Timestamp | Date | null;
+  createdAt?: Timestamp | Date | null;
+  updatedAt?: Timestamp | Date | null;
+  // Allow extra fields without breaking consumers
+  [key: string]: any;
 };
 
 export type Project = {
@@ -42,158 +39,159 @@ export type Project = {
   name?: string;
   ownerId?: string;
   members?: Record<string, boolean>;
-  createdAt?: string;
-  updatedAt?: string;
+  createdAt?: Timestamp | Date | null;
+  updatedAt?: Timestamp | Date | null;
+  [key: string]: any;
 };
 
-type Ctx = {
-  user: FirebaseUser | null;
-  ready: boolean; // auth ready
+// ---------- Context shape ----------
+type ProjectContextValue = {
+  user: User | null;
+  uid: string | null;
+
   projects: Project[];
-  projectId: string | null;
-  setProjectId: (id: string | null) => void;
-  createProject: (name: string) => Promise<string>;
-  error: string | null;
+  loadingProjects: boolean;
+  projectsError: string | null;
 
-  // simple “poke” to tell listeners to refetch tasks if needed
-  refreshSeq: number;
-  refreshTasks: () => void;
+  selectedProjectId: string | null;
+  setSelectedProjectId: (id: string | null) => void;
+
+  selectedProject: Project | null;
+
+  projectId: string | null;
+  createProject: (name: string) => Promise<string>;
+  deleteProject: (id: string) => Promise<void>;
 };
 
-const ProjectContext = createContext<Ctx | null>(null);
+// ---------- Context ----------
+const ProjectContext = createContext<ProjectContextValue | undefined>(undefined);
 
+// ---------- Provider ----------
 export function ProjectProvider({ children }: { children: React.ReactNode }) {
   const auth = useMemo(() => getAuth(app), []);
-  const db = useMemo(() => getFirestore(app), []);
-
-  const [user, setUser] = useState<FirebaseUser | null>(null);
-  const [ready, setReady] = useState(false);
+  const [user, setUser] = useState<User | null>(null);
+  const [uid, setUid] = useState<string | null>(null);
 
   const [projects, setProjects] = useState<Project[]>([]);
-  const [error, setError] = useState<string | null>(null);
+  const [loadingProjects, setLoadingProjects] = useState<boolean>(true);
+  const [projectsError, setProjectsError] = useState<string | null>(null);
 
-  const [projectId, _setProjectId] = useState<string | null>(null);
-  const [refreshSeq, setRefreshSeq] = useState(0);
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
 
-  // -------- auth gate ----------
+  // Watch auth
   useEffect(() => {
-    const off = onAuthStateChanged(auth, (u) => {
+    const unsub = onAuthStateChanged(auth, (u) => {
       setUser(u);
-      setReady(true);
+      setUid(u?.uid ?? null);
     });
-    return off;
+    return () => unsub();
   }, [auth]);
 
-  // -------- restore selected project from localStorage ----------
+  // Subscribe to user's projects with a server-side filter (no client-side filtering)
   useEffect(() => {
-    try {
-      const saved = localStorage.getItem("taktr.projectId");
-      if (saved) _setProjectId(saved);
-    } catch {}
-  }, []);
+    let unsub: Unsubscribe | undefined;
 
-  const setProjectId = useCallback((id: string | null) => {
-    _setProjectId(id);
-    try {
-      if (id) localStorage.setItem("taktr.projectId", id);
-      else localStorage.removeItem("taktr.projectId");
-    } catch {}
-  }, []);
+    async function run() {
+      if (!uid) {
+        setProjects([]);
+        setLoadingProjects(false);
+        return;
+      }
 
-  // -------- subscribe to the user's projects (only after auth) ----------
-  useEffect(() => {
-    if (!ready) return;         // wait for onAuthStateChanged
-    if (!user) {
-      setProjects([]);
-      return;
-    }
+      try {
+        setLoadingProjects(true);
+        setProjectsError(null);
 
-    setError(null);
-    let unsub = () => {};
-    try {
-      // Firestore rule-friendly query: projects where this uid is a member
-      const q = query(
-        collection(db, "projects"),
-        where(`members.${user.uid}`, "==", true)
-      );
+        // Query: projects where members.{uid} == true
+        const q = query(
+          collection(db, "projects"),
+          where(`members.${uid}`, "==", true)
+        );
 
-      unsub = onSnapshot(
-        q,
-        (snap) => {
-          const list: Project[] = [];
-          snap.forEach((doc) => {
-            const d = doc.data() as DocumentData;
-            list.push({
-              id: doc.id,
-              name: d.name,
-              ownerId: d.ownerId,
-              members: d.members,
-              createdAt: d.createdAt?.toDate?.()?.toISOString?.() ?? d.createdAt,
-              updatedAt: d.updatedAt?.toDate?.()?.toISOString?.() ?? d.updatedAt,
-            });
-          });
-          setProjects(list);
+        unsub = onSnapshot(
+          q,
+          (snap) => {
+            const list: Project[] = [];
+            snap.forEach((docSnap) => list.push({ id: docSnap.id, ...(docSnap.data() as any) }));
+            setProjects(list);
+            setLoadingProjects(false);
 
-          // if nothing selected, auto-select the first one
-          if (!projectId && list.length > 0) {
-            setProjectId(list[0].id);
+            // If no selection yet, pick the first project (stable UX)
+            if (!selectedProjectId && list.length > 0) {
+              setSelectedProjectId(list[0].id);
+            }
+          },
+          (err) => {
+            console.error("projects snapshot error:", err);
+            setProjectsError(err?.message || "Failed to load projects");
+            setLoadingProjects(false);
           }
-        },
-        (err) => {
-          console.error("projects snapshot error:", err);
-          setError(err?.message || "Failed to load projects");
-          setProjects([]);
-        }
-      );
-    } catch (e: any) {
-      console.error("projects subscribe error:", e);
-      setError(e?.message || "Failed to load projects");
-      setProjects([]);
+        );
+      } catch (e: any) {
+        console.error("projects query error:", e);
+        setProjectsError(e?.message || "Failed to load projects");
+        setLoadingProjects(false);
+      }
     }
-    return () => unsub();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [db, ready, user?.uid]);
 
-  // -------- create project helper ----------
-  const createProject = useCallback(
-    async (name: string) => {
-      if (!user) throw new Error("Must be signed in to create a project");
-      const docRef = await addDoc(collection(db, "projects"), {
-        name: name?.trim() || "Untitled Project",
-        ownerId: user.uid,
-        members: { [user.uid]: true },
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      });
-      // set selected project to the one we just made
-      setProjectId(docRef.id);
-      return docRef.id;
-    },
-    [db, user, setProjectId]
-  );
+    run();
 
-  // -------- refresh notifier used by UploadSchedule etc. ----------
-  const refreshTasks = useCallback(() => setRefreshSeq((n) => n + 1), []);
+    return () => {
+      if (unsub) unsub();
+    };
+  }, [uid, selectedProjectId]);
 
-  const value: Ctx = {
+  // Derive selected project
+  const selectedProject = useMemo(() => {
+    if (!selectedProjectId) return null;
+    return projects.find((p) => p.id === selectedProjectId) ?? null;
+  }, [projects, selectedProjectId]);
+
+  const createProject = async (name: string): Promise<string> => {
+    if (!uid) throw new Error("Not signed in");
+    const projectsCol = collection(db, "projects");
+    const docRef = await addDoc(projectsCol, {
+      name,
+      ownerId: uid,
+      members: { [uid]: true },
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    });
+    setSelectedProjectId(docRef.id);
+    return docRef.id;
+  };
+
+  const deleteProject = async (id: string): Promise<void> => {
+    if (!uid) throw new Error("Not signed in");
+    const ref = doc(db, "projects", id);
+    await deleteDoc(ref);
+    if (selectedProjectId === id) {
+      setSelectedProjectId(null);
+    }
+  };
+
+  const value: ProjectContextValue = {
     user,
-    ready,
+    uid,
     projects,
-    projectId,
-    setProjectId,
+    loadingProjects,
+    projectsError,
+    selectedProjectId,
+    setSelectedProjectId,
+    selectedProject,
+    projectId: selectedProjectId,
     createProject,
-    error,
-    refreshSeq,
-    refreshTasks,
+    deleteProject,
   };
 
   return <ProjectContext.Provider value={value}>{children}</ProjectContext.Provider>;
 }
 
-export function useProjectContext(): Ctx {
+// ---------- Hook ----------
+export function useProjectContext(): ProjectContextValue {
   const ctx = useContext(ProjectContext);
   if (!ctx) {
-    throw new Error("useProjectContext must be used within <ProjectProvider>");
+    throw new Error("useProjectContext must be used within a ProjectProvider");
   }
   return ctx;
 }
