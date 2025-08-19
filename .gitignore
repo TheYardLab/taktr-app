@@ -10,3 +10,7 @@ serviceAccountKey.json
 serviceAccountKey.json
 .env*
 *.env
+
+# Secrets
+serviceAccountKey.json
+*serviceAccountKey*.json
