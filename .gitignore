@@ -5,3 +5,8 @@ serviceAccountKey.json
 *.env
 .env.local
 
+
+# secrets
+serviceAccountKey.json
+.env*
+*.env
