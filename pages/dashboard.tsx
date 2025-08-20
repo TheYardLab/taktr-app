@@ -19,7 +19,6 @@ import {
   serverTimestamp,
   setDoc,
 } from "firebase/firestore";
-import Resizable from "@/components/ui/Resizable";
 
 /* ---------------------------- Helpers & types ---------------------------- */
 const FallbackBox: React.FC<{ message: string }> = ({ message }) => (
@@ -112,6 +111,19 @@ const SCurveExternal = dynamic(
       })),
   { ssr: false }
 ) as React.ComponentType<{ tasks: UIEditableTask[] }>;
+
+// Resizable panel (components/ui/Resizable.tsx) – dynamic to avoid any SSR/type resolution oddities
+const ResizablePanel = dynamic(
+  () =>
+    import("@/components/ui/Resizable")
+      .then((m) => (m.default as unknown) as React.ComponentType<any>)
+      .catch(() => ({
+        default: ({ children }: { children?: React.ReactNode }) => (
+          <FallbackBox message="Resizable panel not found. Create components/ui/Resizable.tsx." />
+        ),
+      })),
+  { ssr: false }
+) as React.ComponentType<any>;
 
 /* ------------------------------ Project hooks ---------------------------- */
 function fetchTasksSnapshot(projectId: string, setter: (rows: UIEditableTask[]) => void) {
@@ -635,7 +647,7 @@ export default function Dashboard() {
               height={28}
               className="hidden h-7 w-auto sm:block"
               onError={(e) => {
-                (e.currentTarget as any).currentTarget.style.display = "none";
+                (e.currentTarget as HTMLImageElement).style.display = "none";
               }}
               unoptimized
             />
@@ -837,7 +849,7 @@ export default function Dashboard() {
                 {/* Views (export root wraps the whole thing so the full plan is captured) */}
                 <div id="export-root" className="rounded bg-white p-3 shadow overflow-visible">
                   {tab === "takt" ? (
-                    <Resizable
+                    <ResizablePanel
                       key={`takt-${projectId}`}
                       storageKey={`takt:${projectId}`}
                       defaultSize={640}
@@ -846,9 +858,9 @@ export default function Dashboard() {
                       className="min-w-[1000px]"
                     >
                       <TaktPlanExternal projectId={projectId} />
-                    </Resizable>
+                    </ResizablePanel>
                   ) : tab === "tasks" ? (
-                    <Resizable
+                    <ResizablePanel
                       key={`tasks-${projectId}`}
                       storageKey={`tasks:${projectId}`}
                       defaultSize={600}
@@ -856,9 +868,9 @@ export default function Dashboard() {
                       direction="vertical"
                     >
                       <TasksView projectId={projectId} />
-                    </Resizable>
+                    </ResizablePanel>
                   ) : tab === "calendar" ? (
-                    <Resizable
+                    <ResizablePanel
                       key={`cal-${projectId}`}
                       storageKey={`calendar:${projectId}`}
                       defaultSize={700}
@@ -866,9 +878,9 @@ export default function Dashboard() {
                       direction="vertical"
                     >
                       <CalendarView projectId={projectId} />
-                    </Resizable>
+                    </ResizablePanel>
                   ) : tab === "gantt" ? (
-                    <Resizable
+                    <ResizablePanel
                       key={`gantt-${projectId}`}
                       storageKey={`gantt:${projectId}`}
                       defaultSize={640}
@@ -877,9 +889,9 @@ export default function Dashboard() {
                       className="min-w-[1100px]"
                     >
                       <GanttExternal projectId={projectId} />
-                    </Resizable>
+                    </ResizablePanel>
                   ) : tab === "metrics" ? (
-                    <Resizable
+                    <ResizablePanel
                       key={`metrics-${projectId}`}
                       storageKey={`metrics:${projectId}`}
                       defaultSize={460}
@@ -894,9 +906,9 @@ export default function Dashboard() {
                         <div className="text-sm">Not Started: {inlineMetrics.notStarted}</div>
                         <div className="mt-2 text-sm">Completion: {inlineMetrics.pct}%</div>
                       </div>
-                    </Resizable>
+                    </ResizablePanel>
                   ) : (
-                    <Resizable
+                    <ResizablePanel
                       key={`scurve-${projectId}`}
                       storageKey={`scurve:${projectId}`}
                       defaultSize={520}
@@ -905,7 +917,7 @@ export default function Dashboard() {
                       className="min-w-[900px]"
                     >
                       <SCurveExternal tasks={tasks} />
-                    </Resizable>
+                    </ResizablePanel>
                   )}
                 </div>
               </>

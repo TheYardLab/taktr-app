@@ -5,46 +5,69 @@ import { getAuth, Auth } from "firebase-admin/auth";
 
 type AdminBundle = { app: App; db: Firestore; auth: Auth };
 
-function decodeBase64(str?: string | null): string | null {
+function tryParseJSON(str?: string | null): any | null {
   if (!str) return null;
   try {
-    return Buffer.from(str, "base64").toString("utf8");
+    return JSON.parse(str);
+  } catch {
+    return null;
+  }
+}
+
+function tryParseBase64JSON(str?: string | null): any | null {
+  if (!str) return null;
+  try {
+    const decoded = Buffer.from(str, "base64").toString("utf8");
+    return JSON.parse(decoded);
   } catch {
     return null;
   }
 }
 
 function buildCredential(): ServiceAccount {
-  // 1) Prefer a base64-encoded FULL service-account JSON
-  //    (works with either FIREBASE_SERVICE_ACCOUNT_BASE64 or FIREBASE_PRIVATE_KEY_BASE64 in your .env.local)
-  const b64Json =
-    process.env.FIREBASE_SERVICE_ACCOUNT_BASE64 ||
-    process.env.FIREBASE_PRIVATE_KEY_BASE64;
+  // --- Preferred: GOOGLE_APPLICATION_CREDENTIALS_JSON (raw JSON string in env) ---
+  // This should be the full service account JSON pasted into .env.local,
+  // wrapped in single quotes so quotes/newlines are preserved.
+  const gacJsonRaw = process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON;
+  const gacObj =
+    tryParseJSON(gacJsonRaw) ||
+    // Some hosts store it base64-encoded; support that too:
+    tryParseBase64JSON(gacJsonRaw || "");
 
-  const decoded = decodeBase64(b64Json || "");
-  if (decoded) {
-    try {
-      const obj = JSON.parse(decoded);
-      // Expect fields present in a normal service-account JSON
-      const projectId = obj.project_id;
-      const clientEmail = obj.client_email;
-      const privateKey = (obj.private_key || "").replace(/\\n/g, "\n");
-      if (projectId && clientEmail && privateKey) {
-        return { projectId, clientEmail, privateKey };
-      }
-    } catch {
-      // fall through to option 2
+  if (gacObj && gacObj.client_email && gacObj.private_key) {
+    const projectId = gacObj.project_id || process.env.FIREBASE_PROJECT_ID;
+    const clientEmail = gacObj.client_email;
+    const privateKey = String(gacObj.private_key).replace(/\\n/g, "\n");
+    if (projectId && clientEmail && privateKey) {
+      return { projectId, clientEmail, privateKey };
     }
   }
 
-  // 2) Fall back to separate env vars (private key may have \n escapes)
-  const projectId = process.env.FIREBASE_PROJECT_ID;
+  // --- Back-compat: full JSON provided as base64 in FIREBASE_SERVICE_ACCOUNT_BASE64 ---
+  const b64Full = process.env.FIREBASE_SERVICE_ACCOUNT_BASE64 || process.env.FIREBASE_PRIVATE_KEY_BASE64;
+  const b64Obj = tryParseBase64JSON(b64Full || "");
+  if (b64Obj && b64Obj.client_email && b64Obj.private_key) {
+    const projectId = b64Obj.project_id || process.env.FIREBASE_PROJECT_ID;
+    const clientEmail = b64Obj.client_email;
+    const privateKey = String(b64Obj.private_key).replace(/\\n/g, "\n");
+    if (projectId && clientEmail && privateKey) {
+      return { projectId, clientEmail, privateKey };
+    }
+  }
+
+  // --- Last resort: split fields across discrete env vars ---
+  const projectId = process.env.FIREBASE_PROJECT_ID || process.env.GOOGLE_CLOUD_PROJECT || process.env.GCLOUD_PROJECT;
   const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
   const privateKey = (process.env.FIREBASE_PRIVATE_KEY || "").replace(/\\n/g, "\n");
 
   if (!projectId || !clientEmail || !privateKey) {
     throw new Error(
-      "Firebase Admin credentials not found. Provide FIREBASE_SERVICE_ACCOUNT_BASE64 (or FIREBASE_PRIVATE_KEY_BASE64), or FIREBASE_PROJECT_ID + FIREBASE_CLIENT_EMAIL + FIREBASE_PRIVATE_KEY."
+      [
+        "Firebase Admin credentials not found.",
+        "Set GOOGLE_APPLICATION_CREDENTIALS_JSON to the FULL service account JSON",
+        "  (or) FIREBASE_SERVICE_ACCOUNT_BASE64 with the JSON base64-encoded,",
+        "  (or) FIREBASE_PROJECT_ID + FIREBASE_CLIENT_EMAIL + FIREBASE_PRIVATE_KEY.",
+      ].join(" ")
     );
   }
 
@@ -53,12 +76,7 @@ function buildCredential(): ServiceAccount {
 
 function init(): AdminBundle {
   const credential = cert(buildCredential());
-
-  const app =
-    getApps().length === 0
-      ? initializeApp({ credential })
-      : getApp();
-
+  const app = getApps().length === 0 ? initializeApp({ credential }) : getApp();
   const db = getFirestore(app);
   const auth = getAuth(app);
   return { app, db, auth };

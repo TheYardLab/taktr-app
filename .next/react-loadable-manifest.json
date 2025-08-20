@@ -1,48 +1,58 @@
 {
   "node_modules/jspdf/dist/jspdf.es.min.js -> canvg": {
-    "id": "node_modules/jspdf/dist/jspdf.es.min.js -> canvg",
+    "id": 4668,
     "files": [
-      "static/chunks/node_modules_canvg_lib_index_es_js.js"
+      "static/chunks/72a30a16.ddbebfb456000caa.js",
+      "static/chunks/385.51e14eb76c0e6cbe.js"
     ]
   },
   "node_modules/jspdf/dist/jspdf.es.min.js -> dompurify": {
-    "id": "node_modules/jspdf/dist/jspdf.es.min.js -> dompurify",
+    "id": 7856,
     "files": [
-      "static/chunks/node_modules_dompurify_dist_purify_js.js"
+      "static/chunks/856.4d9ed05db4cf45f5.js"
     ]
   },
   "node_modules/jspdf/dist/jspdf.es.min.js -> html2canvas": {
-    "id": "node_modules/jspdf/dist/jspdf.es.min.js -> html2canvas",
+    "id": 1120,
     "files": []
   },
   "pages/dashboard.tsx -> @/components/SCurve": {
-    "id": "pages/dashboard.tsx -> @/components/SCurve",
+    "id": 7403,
     "files": [
-      "static/chunks/components_SCurve_tsx.js"
+      "static/chunks/403.21cf891129c2a5ee.js"
     ]
   },
   "pages/dashboard.tsx -> @/components/TaktPlanSection": {
-    "id": "pages/dashboard.tsx -> @/components/TaktPlanSection",
+    "id": 9831,
     "files": [
-      "static/chunks/components_TaktPlanSection_tsx.js"
+      "static/chunks/831.b5a8af7695c56f36.js"
     ]
   },
   "pages/dashboard.tsx -> @/components/UploadSchedule": {
-    "id": "pages/dashboard.tsx -> @/components/UploadSchedule",
+    "id": 7130,
     "files": [
-      "static/chunks/components_UploadSchedule_tsx.js"
+      "static/chunks/130.7b9aa2131aff06bc.js"
+    ]
+  },
+  "pages/dashboard.tsx -> @/components/ui/Resizable": {
+    "id": 4153,
+    "files": [
+      "static/chunks/153.0af18d2f9eb425e6.js"
     ]
   },
   "pages/dashboard.tsx -> @/components/views/GanttView": {
-    "id": "pages/dashboard.tsx -> @/components/views/GanttView",
+    "id": 2993,
     "files": [
-      "static/chunks/components_views_GanttView_tsx.js"
+      "static/chunks/993.08a450b62290eb8c.js"
     ]
   },
   "pages/dashboard.tsx -> @/lib/exportToPdf": {
-    "id": "pages/dashboard.tsx -> @/lib/exportToPdf",
+    "id": 3820,
     "files": [
-      "static/chunks/lib_exportToPdf_tsx.js"
+      "static/chunks/e78312c5.0b4fca3b95cc0f31.js",
+      "static/chunks/ad7f724d.c1ad2c17f55a011e.js",
+      "static/chunks/412.273227b5ffd25101.js",
+      "static/chunks/489.9052137f0cb114ce.js"
     ]
   }
 }
