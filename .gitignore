@@ -20,3 +20,4 @@ serviceAccountKey.json
 *serviceAccountKey*.json
 .vercel
 .env*.local
+.DS_Store
