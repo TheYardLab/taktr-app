@@ -7,26 +7,31 @@ import { getStorage } from "firebase/storage";
 import type { Auth } from "firebase/auth";
 import { getAuth } from "firebase/auth";
 
-const firebaseConfig = {
-  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY as string | undefined,
-  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN as string | undefined,
-  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID as string | undefined,
-  storageBucket: process.env
-    .NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET as string | undefined,
-  messagingSenderId: process.env
-    .NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID as string | undefined,
-  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID as string | undefined,
-};
-
-// Do NOT throw on server — just warn; the client will use the proper envs.
-if (typeof window !== "undefined" && !firebaseConfig.apiKey) {
-  // This is the only place we’d see the invalid API key symptom.
-  // If you see this in the browser console, check .env.local values & restart.
-  // eslint-disable-next-line no-console
-  console.error(
-    "Missing NEXT_PUBLIC_FIREBASE_* values. Check .env.local and restart the dev server."
-  );
+function requireEnv(name: string): string {
+  const val = process.env[name];
+  if (!val) {
+    throw new Error(
+      `Missing required env var: ${name}. Check your .env.local and Vercel env settings.`
+    );
+  }
+  return val;
 }
+
+const firebaseConfig: {
+  apiKey: string;
+  authDomain: string;
+  projectId: string;
+  storageBucket: string;
+  messagingSenderId: string;
+  appId: string;
+} = {
+  apiKey: requireEnv("NEXT_PUBLIC_FIREBASE_API_KEY"),
+  authDomain: requireEnv("NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN"),
+  projectId: requireEnv("NEXT_PUBLIC_FIREBASE_PROJECT_ID"),
+  storageBucket: requireEnv("NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET"),
+  messagingSenderId: requireEnv("NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID"),
+  appId: requireEnv("NEXT_PUBLIC_FIREBASE_APP_ID"),
+};
 
 export const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
 export const db = getFirestore(app);
