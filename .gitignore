@@ -1,23 +1,18 @@
 node_modules
 
-# secrets
+# Secrets
 serviceAccountKey.json
-*.env
+*serviceAccountKey*.json
+
+# Environment files
+.env
 .env.local
+.env.*
+!.env.example
 
-
-# secrets
-serviceAccountKey.json
-.env*
-*.env
-
-# Secrets
-serviceAccountKey.json
-*serviceAccountKey*.json
-
-# Secrets
-serviceAccountKey.json
-*serviceAccountKey*.json
+# Vercel and system files
 .vercel
-.env*.local
 .DS_Store
+
+# Next.js build output
+.next/
