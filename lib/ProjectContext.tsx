@@ -17,7 +17,7 @@ import {
   deleteDoc,
   serverTimestamp,
 } from "firebase/firestore";
-import { db, app } from "@/lib/firebase";
+import app, { db } from "@/lib/firebase";
 
 // ---------- Types ----------
 export type Task = {
