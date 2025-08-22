@@ -1,40 +1,33 @@
 // pages/api/updateTaskName.ts
-import type { NextApiRequest, NextApiResponse } from 'next';
-import { getFirestore, doc, updateDoc } from 'firebase/firestore';
-import { app } from "@/lib/firebase";
+import type { NextApiRequest, NextApiResponse } from "next";
+import firebaseAdmin from "@/lib/firebaseAdmin";
+import { FieldValue } from "firebase-admin/firestore";
 
-const db = getFirestore(app);
+const { db } = firebaseAdmin;
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method Not Allowed' });
-  }
+  if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
 
   try {
-    const { id, name } = req.body;
-
-    console.log('Received payload:', { id, name });
-
-    if (!id || typeof id !== 'string') {
-      return res.status(400).json({ error: 'Invalid or missing task ID' });
+    const { projectId, taskId, name } = req.body ?? {};
+    if (!projectId || !taskId || typeof name !== "string" || !name.trim()) {
+      return res.status(400).json({ error: "projectId, taskId and non-empty name are required" });
     }
 
-    if (typeof name !== 'string' || name.trim() === '') {
-      return res.status(400).json({ error: 'Invalid or missing task name' });
-    }
+    const ref = db
+      .collection("projects")
+      .doc(projectId)
+      .collection("tasks")
+      .doc(taskId);
 
-    const taskRef = doc(db, 'tasks', id);
+    await ref.update({
+      name: name.trim(),
+      updatedAt: FieldValue.serverTimestamp(),
+    });
 
-    try {
-      await updateDoc(taskRef, { name });
-    } catch (updateError) {
-      console.error(`Error updating task with ID ${id}:`, updateError);
-      return res.status(404).json({ error: 'Task not found or update failed' });
-    }
-
-    return res.status(200).json({ success: true, updatedTask: { id, name } });
-  } catch (error) {
-    console.error('Error updating task name:', error);
-    return res.status(500).json({ error: 'Internal Server Error' });
+    return res.status(200).json({ ok: true });
+  } catch (err: any) {
+    console.error("updateTaskName error:", err);
+    return res.status(500).json({ error: err?.message || "Internal error" });
   }
 }

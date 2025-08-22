@@ -2,7 +2,7 @@
 import React from "react";
 import { useRouter } from "next/router";
 import { getAuth, onAuthStateChanged, User } from "firebase/auth";
-import { app } from "@/lib/firebase";
+import app from "@/lib/firebase";
 
 type WithAuthOptions = {
   redirectTo?: string; // where to send unauthenticated users
